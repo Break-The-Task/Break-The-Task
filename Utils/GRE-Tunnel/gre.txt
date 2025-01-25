@@ -1,0 +1,84 @@
+
+  /$$$$$$  /$$$$$$$  /$$$$$$$$      /$$   /$$ /$$      /$$  /$$$$$$ 
+ /$$__  $$| $$__  $$| $$_____/     | $$  | $$| $$$    /$$$ /$$__  $$
+| $$  \__/| $$  \ $$| $$           | $$  | $$| $$$$  /$$$$| $$  \__/
+| $$ /$$$$| $$$$$$$/| $$$$$ /$$$$$$| $$$$$$$$| $$ $$/$$ $$|  $$$$$$ 
+| $$|_  $$| $$__  $$| $$__/|______/| $$__  $$| $$  $$$| $$ \____  $$
+| $$  \ $$| $$  \ $$| $$           | $$  | $$| $$\  $ | $$ /$$  \ $$
+|  $$$$$$/| $$  | $$| $$$$$$$$     | $$  | $$| $$ \/  | $$|  $$$$$$/
+ \______/ |__/  |__/|________/     |__/  |__/|__/     |__/ \______/
+
+
+
+##########################
+#####    Coté HMS    #####
+##########################
+
+CMD's::
+
+VPS DEBIAN/UBUNTU
+
+1) ip tunnel add gre1 mode gre remote 176.xx.xx.xx local 194.xx.xx.xx ttl 255
+2) ip addr add 10.150.10.1/24 dev gre1
+3) ip link set gre1 up
+4) ip route add IP_SUP/32 dev gre1     
+
+ - (remote "Votre IP-PUBLIC" local IP-VPS-HMS)
+ - (si c'est un block /30 /28 ou autre il faut mettre le bon CIDR pas /32)
+
+5) nano /etc/sysctl.conf
+6) 
+net.ipv4.ip_forward=1
+net.ipv4.conf.all.proxy_arp=1
+net.ipv6.conf.all.forwarding=1
+
+7) sysctl -p
+
+
+
+#####################################
+#####    Coté Mikrotik Local    #####
+#####################################
+
+1) Création de l'interface GRE::
+2) Local Address: 192.xx.xx.xx (IP-CONNEXION de votre mikrotik)
+3) Remote Address: 194.xx.xx.xx (IP-VPS-HMS)
+
+ - (Exemple: https://rdmfile.eu/image/HS8pz70HqX3m/1.png)
+
+4) Ajouté dans "Address list": 
+5) Address: 10.150.10.2/24 (l'ip du tunnel)
+6) Interface: gre2 (l'interface du tunnel) 
+ 
+ - (Exemple: https://rdmfile.eu/image/X7pgCgTuI7Og/2.png)
+
+7) Ajouté dans "Tables": 
+8) Name: R-HMS (Le nom que vous voulez)
+9) FIB: Coché
+
+ - (Exemple: https://rdmfile.eu/image/GtnXirmPRyub/3.png)   
+
+10) Ajouté dans "Route list" : 
+11) Dst Addres: 0.0.0.0/0
+12) Gateway: gre2  (Le nom du tunnel)
+13) Routing Table: R-HMS (le nom de la table)   
+
+ - (Exemple: https://rdmfile.eu/image/Snt7r0oXwCsn/4.png)
+
+14) Ajouté dans "Route list":
+15) Dst Addres: 45.xx.xx.xx/28  (Votre block/IP)
+16) Gateway: ether2 (l'interface réseau sur la quel le block/IP va marché)   
+ 
+ - (Exemple: https://rdmfile.eu/image/OHuapomym7l4/5.png)
+
+17) Ajouté dans "Rules":
+18) Src. Address: 45.xx.xx.xx/28 (Votre block/IP)
+19) Table: R-HMS (le nom de votre table)
+
+ - (Exemple: https://rdmfile.eu/image/1IiWMALomysY/6.png)
+
+20) Ajouté dans "Address List":
+21) Address: 45.xx.xx.xx/24 (L'ip qui vous servira de gateway si vous avez un block mettez une ip du block et si vous avez 1 seul ip mettez cette ip en gateway: "172.16.0.1")
+22) Interface: ether2 (L'interface réseau sur la quel le block/IP va marché)
+
+ - (Exemple: https://rdmfile.eu/image/YpNTrX7Mlu5q/7.png)
