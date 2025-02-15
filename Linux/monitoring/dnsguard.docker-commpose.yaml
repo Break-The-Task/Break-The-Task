@@ -1,0 +1,35 @@
+services:
+  adguardhome:
+    image: "adguard/adguardhome:${ADGUARDHOME_VERSION:-latest}"
+    container_name: adguardhome
+    ports:
+      - 53:53/tcp
+      - 53:53/udp
+      - 784:784/udp
+      - 853:853/tcp
+      - 3000:3000/tcp
+    volumes:
+      - /data/volumes/${SUBFOLDER_WORKDIR:-dns}/adguardhome/workdir:/opt/adguardhome/work
+      - /data/volumes/${SUBFOLDER_WORKDIR:-dns}/adguardhome/confdir:/opt/adguardhome/conf
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}.rule=Host(`${ADGUARDHOME_SUBDOMAIN:-adguard}.${DOMAIN:-exemple.com}`)"
+      - "traefik.http.routers.${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}.entrypoints=websecure"
+      - "traefik.http.routers.${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}.tls=true"
+      # - "traefik.http.routers.${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}.tls.certresolver=letsencrypt"
+      # - "traefik.http.routers.${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}.tls.domains[0].main=${DOMAIN:-exemple.com}"
+      # - "traefik.http.routers.${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}.tls.domains[0].sans=*.${DOMAIN:-exemple.com}"
+      - "traefik.http.routers.${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}http.rule=Host(`${ADGUARDHOME_SUBDOMAIN:-adguard}.${DOMAIN:-exemple.com}`)"
+      - "traefik.http.routers.${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}http.entrypoints=web"
+      - "traefik.http.routers.${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}http.middlewares=redirecttohttps${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}@docker"
+      - "traefik.http.middlewares.redirecttohttps${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirecttohttps${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}.redirectscheme.permanent=true"
+      - "traefik.http.services.redirecttohttps${LABEL_TRAEFIK_ADGUARDHOME:-adguardhome}.loadbalancer.server.port=80"
+    networks:
+      - ${DOCKER_FAKE_NETWORK:-dns_adguardhome}
+
+networks:
+  ${DOCKER_FAKE_NETWORK:-dns_adguardhome}:
+    name: ${NAME_NETWORK:-public_wan}
+    external: true

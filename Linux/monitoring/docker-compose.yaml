@@ -1,0 +1,249 @@
+services:
+  grafana:
+    image: "grafana/grafana-enterprise:${GRAF_VERSION:-latest}"
+    container_name: "${GRAF_CONTAINER_NAME:-grafana}"
+    user: "${GRAF_CONTAINER_USER_ID:-0}"
+
+    hostname: "${GRAF_CONTAINER_HOSTNAME:-56a4d57f326d}"
+    environment:
+      GF_PATHS_CONFIG: ${GF_PATHS_CONFIG:-/etc/grafana/grafana.ini}
+      GF_PATHS_DATA: ${GF_PATHS_DATA:-/var/lib/grafana}
+      GF_PATHS_HOME: ${GF_PATHS_DATA:-/usr/share/grafana}
+      GF_PATHS_LOGS: ${GF_PATHS_LOGS:-/var/log/grafana}
+      GF_PATHS_PLUGINS: ${GF_PATHS_PLUGINS:-/var/lib/grafana/plugins}
+      GF_PATHS_PROVISIONING: ${GF_PATHS_PROVISIONING:-/etc/grafana/provisioning}
+      GF_SERVER_ROOT_URL: ${GF_SERVER_ROOT_URL:-https://${GRAF_SUBDOMAIN:-monitoring}.${DOMAIN:-exemple.com}}
+      GF_SMTP_ENABLED: ${GF_SMTP_ENABLED:-false}
+      GF_SMTP_STARTTLS_POLICY: ${GF_SMTP_STARTTLS_POLICY:-OpportunisticStartTLS}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+    volumes:
+      - "/data/volumes/${SUBFOLDER:-monitoring}/grafana/config/provisionning/datasources:/etc/grafana/provisioning/datasources"
+      - "/data/volumes/${SUBFOLDER:-monitoring}/grafana/config/provisionning/dashboards:/etc/grafana/provisioning/dashboards"
+      - "/data/volumes/${SUBFOLDER:-monitoring}/grafana/config/dashboards:/var/lib/grafana/dashboards"
+      - "/data/volumes/${SUBFOLDER:-monitoring}/grafana:/var/lib/grafana"
+    cap_drop:
+      - "AUDIT_CONTROL"
+      - "BLOCK_SUSPEND"
+      - "DAC_READ_SEARCH"
+      - "IPC_LOCK"
+      - "IPC_OWNER"
+      - "LEASE"
+      - "LINUX_IMMUTABLE"
+      - "MAC_ADMIN"
+      - "MAC_OVERRIDE"
+      - "NET_ADMIN"
+      - "NET_BROADCAST"
+      - "SYSLOG"
+      - "SYS_ADMIN"
+      - "SYS_BOOT"
+      - "SYS_MODULE"
+      - "SYS_NICE"
+      - "SYS_PACCT"
+      - "SYS_PTRACE"
+      - "SYS_RAWIO"
+      - "SYS_RESOURCE"
+      - "SYS_TIME"
+      - "SYS_TTY_CONFIG"
+      - "WAKE_ALARM"
+    restart: "always"
+    logging:
+      driver: "json-file"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${LABEL_TRAEFIK_GRAF:-monitoring}.rule=Host(`${GRAF_SUBDOMAIN:-monitoring}.${DOMAIN:-exemple.com}`)"
+      - "traefik.http.routers.${LABEL_TRAEFIK_GRAF:-monitoring}.entrypoints=websecure"
+      - "traefik.http.routers.${LABEL_TRAEFIK_GRAF:-monitoring}.tls=true"
+      - "traefik.http.routers.${LABEL_TRAEFIK_GRAF:-monitoring}.tls.domains[0].main=${DOMAIN:-exemple.com}"
+      - "traefik.http.routers.${LABEL_TRAEFIK_GRAF:-monitoring}.tls.domains[0].sans=*.${DOMAIN:-exemple.com}"
+      - "traefik.http.routers.${LABEL_TRAEFIK_GRAF:-monitoring}http.rule=Host(`${SUBDOMAIN:-monitoring}.${DOMAIN:-exemple.com}`)"
+      - "traefik.http.routers.${LABEL_TRAEFIK_GRAF:-monitoring}http.entrypoints=web"
+      - "traefik.http.routers.${LABEL_TRAEFIK_GRAF:-monitoring}http.middlewares=redirecttohttps${LABEL_TRAEFIK_GRAF:-monitoring}@docker"
+      - "traefik.http.middlewares.redirecttohttps${LABEL_TRAEFIK_GRAF:-monitoring}.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirecttohttps${LABEL_TRAEFIK_GRAF:-monitoring}.redirectscheme.permanent=true"
+      - "traefik.http.services.redirecttohttps${LABEL_TRAEFIK_GRAF:-monitoring}.loadbalancer.server.port=3000"
+    networks:
+      - ${DOCKER_FAKE_NETWORK:-monitoring}
+
+  renderer:
+    image: grafana/grafana-image-renderer:${RENDERER_VERSION:-latest}
+    container_name: ${RENDERER_CONTAINER_NAME:-renderer}
+    restart: 'unless-stopped'
+    expose:
+    - ${RENDERER_CONTAINER_PORT_EXPOSE:-8081}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${LABEL_TRAEFIK_RENDERER:-renderer}.rule=Host(`${RENDERER_SUBDOMAIN:-renderer}.${DOMAIN:-exemple.com}`)"
+      - "traefik.http.routers.${LABEL_TRAEFIK_RENDERER:-renderer}.entrypoints=websecure"
+      - "traefik.http.routers.${LABEL_TRAEFIK_RENDERER:-renderer}.tls=true"
+      - "traefik.http.routers.${LABEL_TRAEFIK_RENDERER:-renderer}.tls.domains[0].main=${DOMAIN:-exemple.com}"
+      - "traefik.http.routers.${LABEL_TRAEFIK_RENDERER:-renderer}.tls.domains[0].sans=*.${DOMAIN:-exemple.com}"
+      - "traefik.http.routers.${LABEL_TRAEFIK_RENDERER:-renderer}http.rule=Host(`${RENDERER_SUBDOMAIN:-renderer}.${DOMAIN:-exemple.com}`)"
+      - "traefik.http.routers.${LABEL_TRAEFIK_RENDERER:-renderer}http.entrypoints=web"
+      - "traefik.http.routers.${LABEL_TRAEFIK_RENDERER:-renderer}http.middlewares=redirecttohttps${LABEL_TRAEFIK_RENDERER:-renderer}@docker"
+      - "traefik.http.middlewares.redirecttohttps${LABEL_TRAEFIK_RENDERER:-renderer}.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirecttohttps${LABEL_TRAEFIK_RENDERER:-renderer}.redirectscheme.permanent=true"
+      - "traefik.http.services.redirecttohttps${LABEL_TRAEFIK_RENDERER:-renderer}.loadbalancer.server.port=8081"
+    networks:
+      - ${DOCKER_FAKE_NETWORK:-monitoring}
+
+  prometheus:
+    image: "prom/prometheus:${PROM_VERSION:-v2.55.1}"
+    container_name: "${PROM_CONTAINER_NAME:-prometheus}"
+    restart: "unless-stopped"
+    user: "0"
+    expose:
+      - 9090
+    hostname: "pzqj98zq65gz4qjk"
+    logging:
+      driver: "json-file"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+      - "--web.listen-address=0.0.0.0:9090"
+      - "--web.external-url=https://prometheus.cerbonix.eu"
+      - "--storage.tsdb.retention.time=1y"
+    volumes:
+      - "/data/volumes/monitoring/prometheus/config:/etc/prometheus"
+      - "/data/volumes/monitoring/prometheus/www:/prometheus"
+    cap_drop:
+      - "AUDIT_CONTROL"
+      - "BLOCK_SUSPEND"
+      - "DAC_READ_SEARCH"
+      - "IPC_LOCK"
+      - "IPC_OWNER"
+      - "LEASE"
+      - "LINUX_IMMUTABLE"
+      - "MAC_ADMIN"
+      - "MAC_OVERRIDE"
+      - "NET_ADMIN"
+      - "NET_BROADCAST"
+      - "SYSLOG"
+      - "SYS_ADMIN"
+      - "SYS_BOOT"
+      - "SYS_MODULE"
+      - "SYS_NICE"
+      - "SYS_PACCT"
+      - "SYS_PTRACE"
+      - "SYS_RAWIO"
+      - "SYS_RESOURCE"
+      - "SYS_TIME"
+      - "SYS_TTY_CONFIG"
+      - "WAKE_ALARM"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.cerbonix.eu`)"
+      - "traefik.http.routers.prometheus.entrypoints=websecure"
+      - "traefik.http.routers.prometheus.tls=true"
+      - "traefik.http.routers.prometheus.tls.domains[0].main=cerbonix.eu"
+      - "traefik.http.routers.prometheus.tls.domains[0].sans=*.cerbonix.eu"
+      - "traefik.http.routers.prometheushttp.rule=Host(`prometheus.cerbonix.eu`)"
+      - "traefik.http.routers.prometheushttp.entrypoints=web"
+      - "traefik.http.routers.prometheushttp.middlewares=redirecttohttpsprometheus@docker"
+      - "traefik.http.middlewares.redirecttohttpsprometheus.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirecttohttpsprometheus.redirectscheme.permanent=true"
+      - "traefik.http.services.redirecttohttpsprometheus.loadbalancer.server.port=9090"
+    networks:
+      - monitoring
+
+  influxdb:
+    image: influxdb:1.8.10-alpine
+    container_name: influxdb
+    user: "0"
+    command:
+      - 'influxd'
+      - '-config'
+      - '/etc/influxdb/influxdb.conf'
+    restart: 'unless-stopped'
+    environment:
+      INFLUXDB_DB: 'prometheus'
+    ports:
+      - "8086:8086"
+    expose:
+      - 4242
+      - 8086
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.influxdb.loadbalancer.server.port=8086"
+      # Router HTTPS
+      - "traefik.http.routers.influxdb.rule=Host(`influxdb.cerbonix.eu`)"
+      - "traefik.http.routers.influxdb.entrypoints=websecure"
+      - "traefik.http.routers.influxdb.tls=true"
+      - "traefik.http.routers.influxdb.service=influxdb"
+      # Router HTTP pour redirection
+      - "traefik.http.routers.influxdb-http.rule=Host(`influxdb.cerbonix.eu`)"
+      - "traefik.http.routers.influxdb-http.entrypoints=web"
+      - "traefik.http.routers.influxdb-http.middlewares=redirect-https"
+      # Middleware redirection
+      - "traefik.http.middlewares.redirect-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-https.redirectscheme.permanent=true"
+    volumes:
+      - '/data/volumes/monitoring/influxdb/www:/var/lib/influxdb:rw'
+      - '/data/volumes/monitoring/influxdb/config/influxdb.conf:/etc/influxdb/influxdb.conf'
+      - '/data/volumes/traefik/certs:/etc/ssl'
+    networks:
+      - monitoring
+
+  chronograf:
+    image: chronograf:1.10.1
+    container_name: chronograf
+    command:
+      - '--influxdb-url=http://influxdb:8086'
+    restart: 'unless-stopped'
+    expose:
+      - 8888
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.chronograf.rule=Host(`chronograf.cerbonix.eu`)"
+      - "traefik.http.routers.chronograf.entrypoints=websecure"
+      - "traefik.http.routers.chronograf.tls=true"
+      - "traefik.http.routers.chronograf.tls.domains[0].main=cerbonix.eu"
+      - "traefik.http.routers.chronograf.tls.domains[0].sans=*.cerbonix.eu"
+      - "traefik.http.routers.chronografhttp.rule=Host(`chronograf.cerbonix.eu`)"
+      - "traefik.http.routers.chronografhttp.entrypoints=web"
+      - "traefik.http.routers.chronografhttp.middlewares=redirecttohttpschronograf@docker"
+      - "traefik.http.middlewares.redirecttohttpschronograf.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirecttohttpschronograf.redirectscheme.permanent=true"
+      - "traefik.http.services.redirecttohttpschronograf.loadbalancer.server.port=8888"
+    volumes:
+      - '/data/volumes/monitoring/chronograf/data:/var/lib/chronograf'
+    networks:
+      - monitoring
+  alertmanager:
+    container_name: alertmanager
+    image: "prom/alertmanager"
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=https://alertmanager.cerbonix.eu'
+    restart: 'unless-stopped'
+    expose:
+      - 9093
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alertmanager.rule=Host(`alertmanager.cerbonix.eu`)"
+      - "traefik.http.routers.alertmanager.entrypoints=websecure"
+      - "traefik.http.routers.alertmanager.tls=true"
+      - "traefik.http.routers.alertmanager.tls.domains[0].main=cerbonix.eu"
+      - "traefik.http.routers.alertmanager.tls.domains[0].sans=*.cerbonix.eu"
+      - "traefik.http.routers.alertmanagerhttp.rule=Host(`alertmanager.cerbonix.eu`)"
+      - "traefik.http.routers.alertmanagerhttp.entrypoints=web"
+      - "traefik.http.routers.alertmanagerhttp.middlewares=redirecttohttpsalertmanager@docker"
+      - "traefik.http.middlewares.redirecttohttpsalertmanager.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirecttohttpsalertmanager.redirectscheme.permanent=true"
+      - "traefik.http.services.redirecttohttpsalertmanager.loadbalancer.server.port=9093"
+    volumes:
+      - '/data/volumes/monitoring/alertmanager/www:/alertmanager'
+      - '/data/volumes/monitoring/alertmanager/config/config.yml:/etc/alertmanager/config.yml:ro'
+      - '/data/volumes/monitoring/alertmanager/config/template/:/etc/alertmanager/template/:ro'
+      # - '/etc/ssl/certs:/etc/ssl/certs:ro'
+      # - '/etc/pki:/etc/pki:ro'
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    name: ${NAME_NETWORK:-public_wan}
+    external: true
